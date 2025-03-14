@@ -22,8 +22,8 @@ for i in range(1, max_images + 1):
     x2, y2 = min(width, int(x_center + w / 2)), min(height, int(y_center + h / 2))
 
 
-    mask = np.full_like(image, (255, 0, 0), dtype=np.uint8)
-    mask[y1:y2, x1:x2] = image[y1:y2, x1:x2]
+    mask = np.zeros((height, width), dtype=np.uint8)
+    mask[y1:y2, x1:x2] = 255
 
     output_image_path = os.path.join(bbox_path, f"{i}.jpg")
     cv2.imwrite(output_image_path, mask)
