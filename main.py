@@ -3,8 +3,8 @@ import numpy as np
 import os
 
 dataset_path = "C:/Users/ferha/Desktop/Plate_recog/data/images"
-output_path = "C:/Users/ferha/Desktop/Plate_recog/data/labelled_images"
-max_images = 100
+bbox_path = "C:/Users/ferha/Desktop/Plate_recog/data/labelled_images"
+max_images = 1955
 
 for i in range(1, max_images + 1):
     image_path = os.path.join(dataset_path, f"{i}.jpg")
@@ -18,13 +18,14 @@ for i in range(1, max_images + 1):
 
     x_center, y_center, w ,h = int(x_center * width), int(y_center * height), int(w * width), int(h * height)
 
-    x1, y1 = int(x_center - w / 2), int(y_center - h / 2)
-    x2, y2 = int(x_center + w / 2), int(y_center + h / 2)
+    x1, y1 = max(0, int(x_center - w / 2)), max(0, int(y_center - h / 2))
+    x2, y2 = min(width, int(x_center + w / 2)), min(height, int(y_center + h / 2))
 
 
-    cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    mask = np.full_like(image, (255, 0, 0), dtype=np.uint8)
+    mask[y1:y2, x1:x2] = image[y1:y2, x1:x2]
 
-    output_image_path = os.path.join(output_path, f"{i}.jpg")
-    cv2.imwrite(output_image_path, image)
+    output_image_path = os.path.join(bbox_path, f"{i}.jpg")
+    cv2.imwrite(output_image_path, mask)
 
 print("Done")
