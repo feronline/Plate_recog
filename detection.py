@@ -125,12 +125,12 @@ def visualize_detection(image, boxes, scores, class_ids, class_names=None):
 
 
 def detect_plates(model_path, image_path):
-    """ONNX modeli kullanarak plaka tespiti yapar."""
+    """ONNX modeli kullanarak plaka tespiti yapar ve bounding box'ları döndürür."""
     try:
         session = ort.InferenceSession(model_path)
     except Exception as e:
         print(f"Model yüklenirken hata: {e}")
-        return None
+        return None, None
 
     input_name = session.get_inputs()[0].name
     print(f"Model giriş adı: {input_name}")
@@ -139,13 +139,13 @@ def detect_plates(model_path, image_path):
         input_data, original_img, scale_info = preprocess_image(image_path, session)
     except Exception as e:
         print(f"Görüntü önişleme hatası: {e}")
-        return None
+        return None, None
 
     try:
         outputs = session.run(None, {input_name: input_data})
     except Exception as e:
         print(f"Model çıkarım hatası: {e}")
-        return None
+        return None, None
 
     boxes, scores, class_ids = process_output(outputs, scale_info, original_img.shape)
 
@@ -153,25 +153,7 @@ def detect_plates(model_path, image_path):
 
     if len(boxes) > 0:
         result_img = visualize_detection(original_img, boxes, scores, class_ids)
-
-        output_path = "output_" + image_path.split("/")[-1]
-        cv2.imwrite(output_path, result_img)
-        print(f"Sonuç görüntüsü kaydedildi: {output_path}")
-
-        return result_img
+        return result_img, boxes  # Burada bounding box'ları da döndürdüm
     else:
         print("Hiç plaka tespit edilemedi.")
-        return original_img
-
-
-if __name__ == "__main__":
-    model_path = "best.onnx"  # Model yolu
-    image_path = "test.jpg"  # Test görüntüsü yolu
-
-    result = detect_plates(model_path, image_path)
-    if result is not None:
-        cv2.imshow("Detection Result", result)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-    else:
-        print("İşlem başarısız oldu.")
+        return original_img, []  # Boş liste döndür
