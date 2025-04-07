@@ -1,7 +1,23 @@
 import cv2
 import numpy as np
 
+def remove_blue_area(img):
+    """Görüntüdeki mavi alanları tespit eder ve beyaza boyar."""
 
+    # BGR'den HSV renk uzayına geçiş
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    # Mavi renk için HSV aralığı
+    lower_blue = np.array([90, 50, 50])
+    upper_blue = np.array([130, 255, 255])
+
+    # Mavi alanları maskele
+    mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # Mavi alanları beyaza çevir
+    img[mask > 0] = [255, 255, 255]
+
+    return img
 def enhance_plate(img):
     """Plaka görüntüsünü OCR için iyileştirir. Mavi alanı renk koruma ile iyileştirir."""
 
@@ -19,7 +35,7 @@ def enhance_plate(img):
     img[:, :roi_end] = enhanced_roi
 
     # Görüntünün geri kalan %90'lık alanını gri tonlamaya çevir
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(remove_blue_area(img), cv2.COLOR_BGR2GRAY)
 
     # Gürültü azaltma
     gray = cv2.bilateralFilter(gray, 11, 90, 90)
@@ -34,7 +50,7 @@ def enhance_plate(img):
     sharpened = cv2.filter2D(thresholded, -1, kernel_sharpen)
 
     # Morfolojik işlemler
-    kernel_morph = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    kernel_morph = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
     eroded = cv2.erode(sharpened, kernel_morph, iterations=1)
     dilated = cv2.dilate(eroded, kernel_morph, iterations=1)
 
