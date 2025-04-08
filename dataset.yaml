@@ -1,6 +1,0 @@
-path: /content/dataset  # Ana veri yolu (Google Drive'dan çıkarttığın yer)
-train: train  # Train verisinin olduğu klasör (path/train olarak alınır)
-val: test  # Test verisinin olduğu klasör (path/test olarak alınır)
-
-nc: 1  # Sınıf sayısı (sadece 'plate' var)
-names: ["plate"]  # Sınıf ismi
