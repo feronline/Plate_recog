@@ -40,16 +40,16 @@ def add_vehicle():
     renk = data.get("renk")
     yakit_turu = data.get("yakit_turu")
     arac_yili = int(data.get("arac_yili"))
-
+    arac_tipi = data.get("arac_tipi")
     try:
         cursor.execute("SELECT * FROM vehicles WHERE plaka = %s;", (plaka,))
         if cursor.fetchone():
             return jsonify({"message": "Bu plaka zaten kayıtlı."}), 400
 
         cursor.execute("""
-            INSERT INTO vehicles (plaka, marka, model, renk, yakit_turu, arac_yili)
-            VALUES (%s, %s, %s, %s, %s, %s);
-        """, (plaka, marka, model, renk, yakit_turu, arac_yili))
+            INSERT INTO vehicles (plaka, marka, model, renk, yakit_turu, arac_yili, arac_tipi)
+            VALUES (%s, %s, %s, %s, %s, %s, %s);
+        """, (plaka, marka, model, renk, yakit_turu, arac_yili, arac_tipi))
         conn.commit()
         return jsonify({"message": "Araç başarıyla kaydedildi."}), 200
 
@@ -100,7 +100,9 @@ def upload_image():
                             "model": result[2],
                             "renk": result[3],
                             "yakit_turu": result[4],
-                            "arac_yili": result[5]
+                            "arac_yili": result[5],
+                            "arac_tipi": result[6],
+                            "karbon_emisyon": result[7]
                         }
                         return jsonify({
                             "found": True,
