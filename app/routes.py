@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from .detection import detect_plates
 from .enhance import enhance_plate
-from .ocr import ocr_plate
+from .ocr import ocr_plate_multi
 
 
 def setup_routes(app):
@@ -48,8 +48,7 @@ def setup_routes(app):
 
                     enhanced_plate_path = enhance_plate(cropped_plate)
 
-                    ocr_result = ocr_plate(enhanced_plate_path)
-
+                    ocr_result = ocr_plate_multi(enhanced_plate_path)
                     return f'''
                         <h1>OCR Sonucu: {ocr_result}</h1>
                         <h2>Yüklenen Görsel:</h2>

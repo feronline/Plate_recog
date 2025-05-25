@@ -1,122 +1,105 @@
 import cv2
 import pytesseract
 import re
+import easyocr
+from PIL import Image
+import torch
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+import time
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Tes\tesseract.exe"
+reader = easyocr.Reader(['en'])
+processor = TrOCRProcessor.from_pretrained("microsoft/trocr-small-handwritten")
+trocr_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-small-handwritten")
 
-OCR_CORRECTIONS = {
-    "0": "O", "1": "I", "2": "Z", "5": "S", "8": "B",
-    "6": "G", "7": "T", "4": "A"
-}
+ALLOWED_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+def clean_text(text):
+    return ''.join(c for c in text if c in ALLOWED_CHARS)
 
-def correct_ocr_errors(text, harf_sayisi):
-    corrected_text = ""
-    letters_part = True
+def is_valid_plate(text):
+    return bool(re.match(r"^\d{2}[A-Z]{1,3}\d{2,5}$", text))
 
-    for c in text:
-        if letters_part and c in OCR_CORRECTIONS:
-            corrected_text += OCR_CORRECTIONS[c]
-        else:
-            if c.isdigit():
-                letters_part = False
-                if harf_sayisi == 3:
-                    corrected_text += c
-                    continue
-            corrected_text += c
-    return corrected_text
+def score_plate(text):
+    score = 0
+    if is_valid_plate(text):
+        score += 3
+    if 6 <= len(text) <= 9:
+        score += 1
+    if text[:2].isdigit():
+        score += 1
+    if all(c in ALLOWED_CHARS for c in text):
+        score += 1
+    return score
 
+def ocr_easy(img):
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = reader.readtext(img_rgb, detail=0)
+    return results[0].strip().upper() if results else ""
 
-def fix_plate_format(text):
+def ocr_trocr(img):
+    img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    pixel_values = processor(images=img_pil, return_tensors="pt").pixel_values
+    generated_ids = trocr_model.generate(pixel_values)
+    return processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip().upper()
 
-    text = text.upper().replace("O", "0")
-    text = re.sub(r'[^A-Z0-9]', '', text)
-
-    match = re.search(r'\d', text)
-    if not match:
-        return None
-    text = text[match.start():]
-
-    pattern = re.match(r'(\d{2})([A-Z]{1,3})(\d+)', text)
-    if pattern:
-        city, letters, numbers = pattern.groups()
-        if len(letters) == 3:
-            numbers = re.sub(r'[^0-9]', '', numbers)
-        return f"{city} {letters} {numbers}"
-
-    if len(text) >= 5:
-        city = text[:2]
-
-        letters_start = 2
-        letters_end = letters_start
-        while letters_end < len(text) and (text[letters_end].isalpha() or text[letters_end] in "0123456789" and text[
-            letters_end] in OCR_CORRECTIONS):
-            letters_end += 1
-
-        letters = text[letters_start:letters_end]
-
-        for i, c in enumerate(letters):
-            if c.isdigit() and c in OCR_CORRECTIONS:
-                letters = letters[:i] + OCR_CORRECTIONS[c] + letters[i + 1:]
-
-
-        numbers = text[letters_end:]
-
-        if len(letters) >= 1 and len(letters) <= 3 and len(numbers) >= 1:
-            return f"{city} {letters} {numbers}"
-
-    return None
-
-
-def ocr_plate(img):
-    if len(img.shape) == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    img_inv = cv2.bitwise_not(img)
-
+def ocr_tesseract_best(img):
     configs = [
-        r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-        r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
         r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
         r'--oem 3 --psm 13 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     ]
 
-    best_text = None
+    best_text = ""
+    best_score = -1
 
-    images = [img, img_inv]
-
-    for image in images:
-        for config in configs:
-            text = pytesseract.image_to_string(image, config=config).strip()
-            print(f"OCR RAW Output ({config}): {text}")
-
-            fixed_text = fix_plate_format(text)
-            if fixed_text:
-                parts = fixed_text.split()
-                if len(parts) == 3:
-                    part1, part2, part3 = parts
-                    part2 = correct_ocr_errors(part2, len(part2))
-                    formatted_text = f"{part1} {part2} {part3}"
-
-                    plate_patterns = [
-                        r"^\d{2} [A-Z] \d{4,5}$",
-                        r"^\d{2} [A-Z]{2} \d{3,4}$",
-                        r"^\d{2} [A-Z]{3} \d{2,3}$"
-                    ]
-
-                    if any(re.match(p, formatted_text) for p in plate_patterns):
-                        best_text = formatted_text
-                        break
-
-        if best_text:
-            break
-
-    if not best_text and "DUA" in text:
+    for config in configs:
         try:
+            text = pytesseract.image_to_string(img, config=config).strip().upper()
+            cleaned = clean_text(text)
+            score = score_plate(cleaned)
 
-            if "34" in text and "DUA" in text:
-                return "34 DUA 34"
-        except:
-            pass
+            print(f"Tesseract ({config}) → {cleaned} [Skor: {score}]")
+
+            if score > best_score:
+                best_text = cleaned
+                best_score = score
+        except Exception as e:
+            print(f"Tesseract ({config}) hata verdi: {e}")
 
     return best_text
+
+def ocr_plate_multi(img):
+    timings = {}
+
+    # Tesseract
+    start = time.time()
+    tesseract_result = ocr_tesseract_best(img)
+    timings["Tesseract"] = time.time() - start
+
+    # EasyOCR
+    start = time.time()
+    easyocr_result = clean_text(ocr_easy(img))
+    timings["EasyOCR"] = time.time() - start
+
+    # TrOCR
+    start = time.time()
+    trocr_result = clean_text(ocr_trocr(img))
+    timings["TrOCR"] = time.time() - start
+
+    results = {
+        "Tesseract": tesseract_result,
+        "EasyOCR": easyocr_result,
+        "TrOCR": trocr_result
+    }
+
+    scored = {k: (v, score_plate(v)) for k, v in results.items()}
+    best = max(scored.items(), key=lambda x: x[1][1])
+
+    print(f"OCR Karşılaştırması: {scored}")
+    print(f"⏱️ Süreler (saniye): {timings}")
+
+    return best[1][0]
+
+    scored = {k: (v, score_plate(v)) for k, v in results.items()}
+    best = max(scored.items(), key=lambda x: x[1][1])
+    print(f"OCR Karşılaştırması: {scored}")
+    return best[1][0]

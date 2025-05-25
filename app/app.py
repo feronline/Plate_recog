@@ -4,9 +4,10 @@ import cv2
 import psycopg2
 from detection import detect_plates
 from enhance import enhance_plate
-from ocr import ocr_plate
+from ocr import ocr_plate_multi
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+import time
 load_dotenv()
 
 
@@ -21,7 +22,6 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULT_FOLDER'] = RESULT_FOLDER
 
-# --- PostgreSQL Bağlantısı ---
 conn = psycopg2.connect(
     host=os.getenv("PGHOST"),
     port=os.getenv("PGPORT"),
@@ -60,66 +60,88 @@ def add_vehicle():
 
 @app.route('/upload', methods=['POST'])
 def upload_image():
-    if 'file' not in request.files:
-        return jsonify({"error": "Dosya bulunamadı. Lütfen bir fotoğraf seçin."}), 400
+    global_start = time.time()
 
-    file = request.files['file']
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "Dosya bulunamadı."}), 400
 
-    if file.filename == '':
-        return jsonify({"error": "Geçersiz dosya. Lütfen bir fotoğraf seçin."}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "Geçersiz dosya."}), 400
 
-    if file:
+        file_start = time.time()
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
+        file_duration = time.time() - file_start
 
+        detection_start = time.time()
         model_path = "../best.onnx"
-        try:
-            result_img, bounding_boxes = detect_plates(model_path, filepath)
+        result_img, bounding_boxes = detect_plates(model_path, filepath)
+        detection_duration = time.time() - detection_start
 
-            if result_img is not None and len(bounding_boxes) > 0:
-                image = cv2.imread(filepath)
-                for (x1, y1, x2, y2) in bounding_boxes:
-                    x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-                    cropped_plate = image[y1:y2, x1:x2]
+        if result_img is not None and len(bounding_boxes) > 0:
+            image = cv2.imread(filepath)
 
-                    enhanced_plate_path = enhance_plate(cropped_plate)
-                    ocr_result = ocr_plate(enhanced_plate_path)
+            for (x1, y1, x2, y2) in bounding_boxes:
+                x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+                cropped_plate = image[y1:y2, x1:x2]
 
-                    if not ocr_result:
-                        continue  # boş sonuçsa atla
+                enhance_start = time.time()
+                enhanced_plate_path = enhance_plate(cropped_plate)
+                enhance_duration = time.time() - enhance_start
 
-                    # Veritabanında plakayı ara
-                    cursor.execute("SELECT * FROM vehicles WHERE plaka = %s;", (ocr_result,))
-                    result = cursor.fetchone()
+                ocr_start = time.time()
+                ocr_result = ocr_plate_multi(enhanced_plate_path)
+                ocr_duration = time.time() - ocr_start
 
-                    if result:
-                        arac_data = {
-                            "plaka": result[0],
-                            "marka": result[1],
-                            "model": result[2],
-                            "renk": result[3],
-                            "yakit_turu": result[4],
-                            "arac_yili": result[5],
-                            "arac_tipi": result[6],
-                            "karbon_emisyon": result[7]
-                        }
-                        return jsonify({
-                            "found": True,
-                            "arac": arac_data
-                        }), 200
-                    else:
-                        return jsonify({
-                            "found": False,
-                            "plaka": ocr_result
-                        }), 200
+                if not ocr_result:
+                    continue
 
+                db_start = time.time()
+                cursor.execute("SELECT * FROM vehicles WHERE plaka = %s;", (ocr_result,))
+                result = cursor.fetchone()
+                db_duration = time.time() - db_start
+
+                if result:
+                    arac_data = {
+                        "plaka": result[0],
+                        "marka": result[1],
+                        "model": result[2],
+                        "renk": result[3],
+                        "yakit_turu": result[4],
+                        "arac_yili": result[5],
+                        "arac_tipi": result[6],
+                        "karbon_emisyon": result[7]
+                    }
+                    response = jsonify({"found": True, "arac": arac_data}), 200
+                else:
+                    response = jsonify({"found": False, "plaka": ocr_result}), 200
+
+                break
             else:
-                return jsonify({"error": "Plaka algılanamadı!"}), 400
-        except Exception as e:
-            return jsonify({"error": f"İşleme sırasında hata: {str(e)}"}), 500
+                response = jsonify({"error": "Plaka tespit edilemedi."}), 400
+        else:
+            response = jsonify({"error": "Plaka algılanamadı!"}), 400
 
-    return jsonify({"error": "Bir hata oluştu. Lütfen tekrar deneyin."}), 500
+    except Exception as e:
+        response = jsonify({"error": f"İşleme sırasında hata: {str(e)}"}), 500
+
+    finally:
+        total_duration = time.time() - global_start
+        print(f"""
+⏱️ Süreler:
+- Dosya işlemleri:       {file_duration:.3f} sn
+- Plaka tespiti:         {detection_duration:.3f} sn
+- Görüntü iyileştirme:   {enhance_duration:.3f} sn
+- OCR süresi:            {ocr_duration:.3f} sn
+- Veritabanı sorgusu:    {db_duration:.3f} sn
+- Toplam API süresi:     {total_duration:.3f} sn
+""")
+
+    return response
+
 
 
 @app.route('/static/uploads/<filename>')
