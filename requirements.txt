@@ -1,4 +1,4 @@
-flask
+ÿþflask
 psycopg2
 opencv-python
 pillow
