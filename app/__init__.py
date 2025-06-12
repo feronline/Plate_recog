@@ -19,3 +19,7 @@ def create_app():
     setup_routes(app)
 
     return app
+
+
+def upload_image():
+    return None

@@ -98,8 +98,3 @@ def ocr_plate_multi(img):
     print(f"⏱️ Süreler (saniye): {timings}")
 
     return best[1][0]
-
-    scored = {k: (v, score_plate(v)) for k, v in results.items()}
-    best = max(scored.items(), key=lambda x: x[1][1])
-    print(f"OCR Karşılaştırması: {scored}")
-    return best[1][0]

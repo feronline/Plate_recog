@@ -8,6 +8,7 @@ from ocr import ocr_plate_multi
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import time
+
 load_dotenv()
 
 
@@ -15,7 +16,7 @@ app = Flask(__name__)
 
 UPLOAD_FOLDER = 'uploads'
 RESULT_FOLDER = 'results'
-
+plate_queue = None
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
@@ -115,6 +116,7 @@ def upload_image():
                         "arac_tipi": result[6],
                         "karbon_emisyon": result[7]
                     }
+                    plate_queue.put(ocr_result)
                     response = jsonify({"found": True, "arac": arac_data}), 200
                 else:
                     response = jsonify({"found": False, "plaka": ocr_result}), 200
@@ -154,5 +156,7 @@ def result_file(filename):
     return send_from_directory(app.config['RESULT_FOLDER'], filename)
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+def run_with_queue(queue):
+    global plate_queue
+    plate_queue = queue
+    app.run(host="0.0.0.0", port=5000)
