@@ -5,99 +5,64 @@ import math
 from datetime import datetime, timedelta
 import json
 
+# Ekran boyutları (görüntü için uygun)
+WIDTH, HEIGHT = 1609, 907
 
-# Renkler ve sabitler
+# Ölçekleme fonksiyonu (haritaya göre)
+def scale_point(x, y, original_width=1609, original_height=907, target_width=WIDTH, target_height=HEIGHT):
+    scaled_x = int(x / original_width * target_width)
+    scaled_y = int(y / original_height * target_height)
+    return (scaled_x, scaled_y)
+
+# Renkler
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+# Araç renkleri
 def get_car_colors():
     return [
         (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 165, 0), (128, 0, 128),
         (0, 255, 255), (255, 255, 0), (128, 128, 128), (255, 105, 180), (0, 128, 128)
     ]
-
-
 CAR_COLORS = get_car_colors()
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-WIDTH, HEIGHT = 700, 700
 
-# Yol ağı - tam olarak resimdeki gibi
+# Gerçek koordinatlara göre tanımlı durak bağlantıları
 ROAD_NETWORK = {
-    # Kırmızı giriş/çıkış noktası - sağ tarafta (resimdeki gibi)
-    (550, 250): [(500, 250)],
-
-    # Dikdörtgen üzerindeki ana noktalar
-    # Üst kenar noktaları (soldan sağa)
-    (150, 150): [(100, 100), (250, 150), (100, 250), (200, 200), (150, 350)],
-    (250, 150): [(150, 150), (350, 150), (250, 100), (300, 200)],
-    (350, 150): [(250, 150), (450, 150), (400, 100), (400, 200)],
-    (450, 150): [(350, 150), (500, 150), (500, 100), (500, 250)],
-    (500, 150): [(450, 150), (500, 250)],
-
-    # Sağ kenar noktaları (yukarıdan aşağıya)
-    (500, 250): [(550, 250), (500, 150), (500, 350), (400, 300)],
-    (500, 350): [(500, 250), (450, 350), (500, 400)],
-
-    # Alt kenar noktaları (sağdan sola)
-    (450, 350): [(500, 350), (350, 350), (400, 400), (400, 300)],
-    (350, 350): [(450, 350), (250, 350), (300, 400), (300, 300)],
-    (250, 350): [(350, 350), (150, 350), (200, 400), (200, 300)],
-    (150, 350): [(250, 350), (100, 300), (100, 400), (150, 150)],
-
-    # Dikdörtgen dışındaki noktalar
-    # Üst dış noktalar
-    (100, 100): [(150, 150), (250, 100)],
-    (250, 100): [(100, 100), (250, 150), (400, 100)],
-    (400, 100): [(250, 100), (450, 150), (500, 100)],
-    (500, 100): [(400, 100), (500, 150)],
-
-    # Sol dış noktalar
-    (100, 250): [(150, 150), (100, 300)],
-    (100, 300): [(100, 250), (150, 350)],
-
-    # Alt dış noktalar
-    (100, 400): [(150, 350), (200, 400)],
-    (200, 400): [(100, 400), (250, 350), (300, 400)],
-    (300, 400): [(200, 400), (350, 350), (400, 400)],
-    (400, 400): [(300, 400), (450, 350), (500, 400)],
-    (500, 400): [(400, 400), (500, 350)],
-
-    # Sağ alt dış nokta
-    (550, 400): [(500, 400)],
-
-    # Dikdörtgen içindeki noktalar ve diagonal bağlantılar
-    (200, 200): [(150, 150), (300, 200), (200, 300)],
-    (300, 200): [(200, 200), (250, 150), (400, 200), (300, 300), (325, 250)],
-    (400, 200): [(300, 200), (350, 150), (500, 250), (400, 300), (325, 250)],
-
-    (200, 300): [(200, 200), (250, 350), (300, 300)],
-    (300, 300): [(200, 300), (300, 200), (350, 350), (400, 300), (325, 250)],
-    (400, 300): [(300, 300), (400, 200), (450, 350), (500, 250), (325, 250)],
-
-    # Merkez nokta
-    (325, 250): [(300, 200), (300, 300), (400, 200), (400, 300)],
+    (1530, 300): [(1400, 380)],
+    (1400, 380): [(1530, 300), (1470, 600), (1300, 430)],
+    (1470, 600): [(1400, 380), (1389, 764)],  # Eski bağlantı (1075, 830) kaldırıldı
+    (930, 830): [(1389, 764), (677, 660)],  # Eski bağlantı (1470, 600) kaldırıldı
+    (1389, 764): [(1470, 600), (930, 830)],
+    (677, 660): [(930, 830), (500, 580), (756, 562)],
+    (500, 580): [(677, 660), (250, 470)],
+    (250, 470): [(500, 580), (120, 209)],
+    (120, 209): [(250, 470), (500, 165),(500, 100)],
+    (500, 165): [(120, 209)],
+    (500, 100): [(830, 220),(120, 209)],
+    (830, 220): [(500, 100), (1000, 350)],
+    (1000, 350): [(830, 220), (1145, 430)],
+    (1145, 430): [(1000, 350), (1300, 430), (1100, 510)],
+    (1300, 430): [(1145, 430), (1400, 380)],
+    (1100, 510): [(1145, 430)],
+    (756, 562): [(677, 660), (990, 685)],
+    (990, 685): [(756, 562)]
 }
 
-# Giriş/Çıkış noktası (kırmızı nokta)
-ENTRY_EXIT_POINT = (550, 250)
+ENTRY_EXIT_POINT = (1530, 300)
+TARGETS = list(ROAD_NETWORK.keys())
 
-# Hedef noktalar (park alanları)
-TARGETS = [
-    # Dış noktalar
-    (100, 100), (250, 100), (400, 100), (500, 100),
-    (100, 250), (100, 300),
-    (100, 400), (200, 400), (300, 400), (400, 400), (500, 400),
-    (550, 400),
-
-    # İç noktalar
-    (200, 200), (300, 200), (400, 200),
-    (200, 300), (300, 300), (400, 300),
-    (325, 250)
-]
+# Ölçeklenmiş değerler
+def scale_network(network):
+    return {scale_point(*k): [scale_point(*v) for v in vs] for k, vs in network.items()}
+SCALED_ROAD_NETWORK = scale_network(ROAD_NETWORK)
+SCALED_TARGETS = [scale_point(*t) for t in TARGETS]
+SCALED_ENTRY_EXIT_POINT = scale_point(*ENTRY_EXIT_POINT)
 
 active_vehicles = []
 gps_log = []
 
-
 class Vehicle:
+    car_icon = None
     def __init__(self, id, color, pos):
         self.id = id
         self.original_color = color  # Orijinal rengi sakla
@@ -125,7 +90,10 @@ class Vehicle:
         # Giriş saatini yazdır
         print(
             f"{self.id} plakalı araç kampüse giriş yaptı. Giriş saati: {self.entry_time.strftime('%H:%M:%S')}, Renk: {self.original_color}")
-
+        if Vehicle.car_icon is None:
+            # Araba ikonunu sadece 1 kez yükle ve boyutlandır
+            original_icon = pygame.image.load("../carico.png").convert_alpha()
+            Vehicle.car_icon = pygame.transform.scale(original_icon, (32, 32))
     def find_route(self, start, end):
         # Basit BFS ile yol bulma
         if start == end:
@@ -373,21 +341,21 @@ class Vehicle:
             self.moving_time += dt
 
     def draw(self, surface):
-        # Park halinde mutlaka gri renk kullan
+        icon = Vehicle.car_icon
         if self.status == "parked":
-            color_to_use = (64, 64, 64)  # Koyu gri
-        else:
-            color_to_use = self.original_color
+            icon = pygame.Surface((32, 32), pygame.SRCALPHA)
+            icon.blit(Vehicle.car_icon, (0, 0))
+            # Üstüne gri filtre uygula
+            icon.fill((64, 64, 64, 150), special_flags=pygame.BLEND_RGBA_MULT)
 
-        pygame.draw.rect(surface, color_to_use, (int(self.x) - 7, int(self.y) - 7, 14, 14))
+        surface.blit(icon, (int(self.x) - 16, int(self.y) - 16))  # Ortalamak için
 
-        # Araç plakası ve durumunu göster
+        # Plaka bilgisini çiz
         font = pygame.font.Font(None, 16)
         status_text = "P" if self.status == "parked" else "M"
         text = font.render(f"{self.id}-{status_text}", True, BLACK)
-        # Metni ortalamak için text genişliğini hesapla
         text_rect = text.get_rect()
-        surface.blit(text, (int(self.x) - text_rect.width // 2, int(self.y) - 25))
+        surface.blit(text, (int(self.x) - text_rect.width // 2, int(self.y) - 30))
 
     def get_gps_like_data(self):
         return {
@@ -400,42 +368,40 @@ class Vehicle:
         }
 
 
-def draw_campus(surface):
-    # Ana dikdörtgen sınır (resimdeki gibi)
-    pygame.draw.rect(surface, BLACK, (150, 150, 350, 200), 3)
 
-    # Yol ağını çiz (ince gri çizgiler)
-    GRAY = (128, 128, 128)
-    for node, connections in ROAD_NETWORK.items():
-        for connected_node in connections:
-            pygame.draw.line(surface, GRAY, node, connected_node, 1)
-
-    # Tüm düğümleri beyaz daireler ile çiz
-    for node in ROAD_NETWORK.keys():
-        pygame.draw.circle(surface, WHITE, node, 8)
-        pygame.draw.circle(surface, BLACK, node, 8, 2)
-
-    # Ana giriş/çıkış noktasını kırmızı ile vurgula (büyük)
-    RED = (255, 0, 0)
-    pygame.draw.circle(surface, RED, ENTRY_EXIT_POINT, 12)
-    pygame.draw.circle(surface, BLACK, ENTRY_EXIT_POINT, 12, 3)
-
-    # Bazı önemli park noktalarını yeşil ile işaretle
-    GREEN = (0, 150, 0)
-    important_parking = [(100, 100), (500, 100), (100, 400), (500, 400), (325, 250)]
-    for target in important_parking:
-        if target in ROAD_NETWORK:
-            pygame.draw.circle(surface, GREEN, target, 6)
 
 def start_vehicle_simulation(plate):
     color = random.choice(CAR_COLORS)
-    entry_point = (500, 250)  # Dikdörtgen kenarındaki giriş noktası
+    entry_point = ENTRY_EXIT_POINT
+ # Dikdörtgen kenarındaki giriş noktası
     vehicle = Vehicle(plate, color, entry_point)
     active_vehicles.append(vehicle)
 
 def run_simulation(plate_queue):
+    global background  # dışarıdaki background'a erişim
+    background = pygame.image.load("../saumap.png")
+    WIDTH, HEIGHT = background.get_size()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+    def draw_campus(surface):
+        surface.blit(background, (0, 0))
+
+        # Yollar
+        for node, connections in SCALED_ROAD_NETWORK.items():
+            for connected_node in connections:
+                pygame.draw.line(surface, (200, 200, 200), node, connected_node, 3)
+
+        # Duraklar
+        for node in SCALED_TARGETS:
+            pygame.draw.circle(surface, (255, 0, 0), node, 14)
+            pygame.draw.circle(surface, (255, 255, 255), node, 16, 3)
+
+        # Giriş-çıkış
+        pygame.draw.circle(surface, (255, 0, 0), SCALED_ENTRY_EXIT_POINT, 12)
+        pygame.draw.circle(surface, (0, 0, 0), SCALED_ENTRY_EXIT_POINT, 12, 3)
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
     pygame.display.set_caption("Kampüs Simülasyonu")
     clock = pygame.time.Clock()
 
@@ -477,6 +443,15 @@ def run_simulation(plate_queue):
                 print(f"  Kampüste toplam kalma süresi: {int(total_time.total_seconds())} saniye")
                 print(f"  Park ettiği toplam süre: {int(v.total_parked_time)} saniye")
                 print(f"  Gerçek hareket ettiği süre: {int(actual_moving_time)} saniye")
+                from db_utils import log_vehicle_to_db
+                log_vehicle_to_db(
+                    v.id,
+                    v.entry_time,
+                    current_time,
+                    int(total_time.total_seconds()),
+                    int(v.total_parked_time),
+                    int(actual_moving_time)
+                )
                 print("-" * 50)
                 exited_vehicles.append(v)
 

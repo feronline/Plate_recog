@@ -8,6 +8,7 @@ from ocr import ocr_plate_multi
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import time
+from brand_detector import detect_brand
 
 load_dotenv()
 
@@ -105,10 +106,15 @@ def upload_image():
                 result = cursor.fetchone()
                 db_duration = time.time() - db_start
 
+                # Marka tespiti
+
+                detected_brand = detect_brand(filepath)
+                print(f"🧠 Tespit edilen marka: {detected_brand}")
+
                 if result:
                     arac_data = {
                         "plaka": result[0],
-                        "marka": result[1],
+                        "marka": detected_brand if result[1] is None or result[1] == "unknown" else result[1],
                         "model": result[2],
                         "renk": result[3],
                         "yakit_turu": result[4],
@@ -119,7 +125,7 @@ def upload_image():
                     plate_queue.put(ocr_result)
                     response = jsonify({"found": True, "arac": arac_data}), 200
                 else:
-                    response = jsonify({"found": False, "plaka": ocr_result}), 200
+                    response = jsonify({"found": False, "plaka": ocr_result, "marka": detected_brand}), 200
 
                 break
             else:
@@ -128,6 +134,7 @@ def upload_image():
             response = jsonify({"error": "Plaka algılanamadı!"}), 400
 
     except Exception as e:
+        print(f"🔥 Sunucu hatası: {e}")
         response = jsonify({"error": f"İşleme sırasında hata: {str(e)}"}), 500
 
     finally:
@@ -143,6 +150,36 @@ def upload_image():
 """)
 
     return response
+
+@app.route("/vehicle_logs", methods=["GET"])
+def get_vehicle_log():
+    plaka = request.args.get("plaka")  # ?plaka=... kısmını alır
+    if not plaka:
+        return jsonify({"error": "Plaka parametresi eksik"}), 400
+
+    try:
+        cursor.execute("SELECT * FROM vehicle_logs WHERE plate = %s;", (plaka,))
+        result = cursor.fetchone()
+
+        if result is None:
+            return jsonify({"found": False, "message": "Kayıt bulunamadı."}), 200
+
+        log_data = {
+            "plaka": result[0],
+            "entry_time": result[1].isoformat() if result[1] else None,
+            "exit_time": result[2].isoformat() if result[2] else None,
+            "total_time_seconds": result[3],
+            "total_parked_seconds": result[4],
+            "actual_moving_seconds": result[5],
+            "carbon_emission": result[6]
+        }
+
+        return jsonify({"found": True, "log": log_data}), 200
+
+    except Exception as e:
+        print(f"❌ Log sorgu hatası: {e}")
+        return jsonify({"error": "Sunucu hatası."}), 500
+
 
 
 
