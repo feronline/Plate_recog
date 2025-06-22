@@ -110,28 +110,31 @@ def upload_image():
 
 
 @app.route("/vehicle_logs", methods=["GET"])
-def get_vehicle_log():
-    plaka = request.args.get("plaka")
-    if not plaka:
-        return jsonify({"error": "Plaka eksik"}), 400
+def get_all_vehicle_logs():
+    try:
+        cursor.execute("SELECT * FROM vehicle_logs;")
+        results = cursor.fetchall()
 
-    cursor.execute("SELECT * FROM vehicle_logs WHERE plate = %s;", (plaka,))
-    result = cursor.fetchone()
+        if not results:
+            return jsonify({"found": False, "message": "Kayıt bulunamadı."}), 200
 
-    if result is None:
-        return jsonify({"found": False, "message": "Kayıt bulunamadı."}), 200
+        logs = []
+        for result in results:
+            logs.append({
+                "plaka": result[0],
+                "entry_time": result[1].isoformat() if result[1] else None,
+                "exit_time": result[2].isoformat() if result[2] else None,
+                "total_time_seconds": result[3],
+                "total_parked_seconds": result[4],
+                "actual_moving_seconds": result[5],
+                "carbon_emission": result[6]
+            })
 
-    log_data = {
-        "plaka": result[0],
-        "entry_time": result[1].isoformat() if result[1] else None,
-        "exit_time": result[2].isoformat() if result[2] else None,
-        "total_time_seconds": result[3],
-        "total_parked_seconds": result[4],
-        "actual_moving_seconds": result[5],
-        "carbon_emission": result[6]
-    }
+        return jsonify({"found": True, "logs": logs}), 200
 
-    return jsonify({"found": True, "log": log_data}), 200
+    except Exception as e:
+        print(f"❌ Tüm logları çekme hatası: {e}")
+        return jsonify({"error": "Sunucu hatası."}), 500
 
 
 @app.route('/static/uploads/<filename>')

@@ -8,7 +8,7 @@ from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 import time
 
 reader = easyocr.Reader(['en'])
-processor = TrOCRProcessor.from_pretrained("microsoft/trocr-small-handwritten")
+processor = TrOCRProcessor.from_pretrained("microsoft/trocr-small-handwritten", use_fast=True)
 trocr_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-small-handwritten")
 
 ALLOWED_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
