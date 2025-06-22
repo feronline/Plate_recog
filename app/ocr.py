@@ -70,17 +70,14 @@ def ocr_tesseract_best(img):
 def ocr_plate_multi(img):
     timings = {}
 
-    # Tesseract
     start = time.time()
     tesseract_result = ocr_tesseract_best(img)
     timings["Tesseract"] = time.time() - start
 
-    # EasyOCR
     start = time.time()
     easyocr_result = clean_text(ocr_easy(img))
     timings["EasyOCR"] = time.time() - start
 
-    # TrOCR
     start = time.time()
     trocr_result = clean_text(ocr_trocr(img))
     timings["TrOCR"] = time.time() - start

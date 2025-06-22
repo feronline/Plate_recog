@@ -35,7 +35,6 @@ def setup_routes(app):
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
-            # İşlemleri gerçekleştir
             model_path = "best.onnx"
             result_img, bounding_boxes = detect_plates(model_path, filepath)
 

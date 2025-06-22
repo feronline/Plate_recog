@@ -5,7 +5,6 @@ import onnxruntime as ort
 
 def preprocess_image(image_path, session, input_size=(640, 640)):
 
-    # Görüntüyü yükle
     img = cv2.imread(image_path)
     if img is None:
         raise ValueError(f"Görüntü yüklenemedi: {image_path}")

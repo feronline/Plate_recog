@@ -13,7 +13,7 @@ def log_vehicle_to_db(plate, entry_time, exit_time, total_time_s, parked_time_s,
         cur.execute("SELECT karbon_emisyon FROM vehicles WHERE plaka = %s", (plate,))
         result = cur.fetchone()
         if result is None or result[0] is None:
-            print(f"❌ {plate} plakalı araç için karbon_emisyon değeri bulunamadı.")
+            print(f"{plate} plakalı araç için emisyon değeri yok.")
             return
 
         emission_rate_per_km = result[0]

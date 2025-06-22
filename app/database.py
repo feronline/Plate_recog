@@ -4,7 +4,6 @@ conn = psycopg2.connect("postgresql://postgres:axKfBzyEDoOigbkcRShuLiGquuqochjf@
 
 cur = conn.cursor()
 
-# OUR CARS
 cur.execute("""
 CREATE TABLE IF NOT EXISTS vehicles (
     plaka TEXT PRIMARY KEY,
@@ -16,7 +15,6 @@ CREATE TABLE IF NOT EXISTS vehicles (
 );
 """)
 
-# ALL CARS
 cur.execute("""
 CREATE TABLE IF NOT EXISTS vehicle_emissions (
     marka TEXT NOT NULL,
